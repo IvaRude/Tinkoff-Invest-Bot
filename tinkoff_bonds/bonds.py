@@ -5,6 +5,7 @@ from typing import List, Tuple
 import pytz
 from tinkoff.invest import Bond, Coupon
 from tinkoff.invest import Client
+from tinkoff.invest.exceptions import RequestError
 
 from secrets import TINKOFF_TOKEN
 
@@ -26,15 +27,20 @@ def count_coupon_sums_for_bonds(client: Client, bonds: List[Bond]) -> List[int]:
     ind = 0
     coupon_sums = [0] * n
     cur = n
-    while cur > CHUNK_LIMIT:
-        for _ in range(CHUNK_LIMIT):
-            coupon_sums[ind] = count_total_last_coupons_sum(client, bonds[ind])
-            ind += 1
-        cur -= CHUNK_LIMIT
-        print(ind)
-        time.sleep(3)
+    # while cur > CHUNK_LIMIT:
+    #     for _ in range(CHUNK_LIMIT):
+    #         coupon_sums[ind] = count_total_last_coupons_sum(client, bonds[ind])
+    #         ind += 1
+    #     cur -= CHUNK_LIMIT
+    #     print(ind)
+    #     time.sleep(3)
     for i in range(ind, n):
-        coupon_sums[i] = count_total_last_coupons_sum(client, bonds[i])
+        try:
+            coupon_sums[i] = count_total_last_coupons_sum(client, bonds[i])
+        except RequestError as e:
+            # ratelimit_reset = e.details.
+            # print(e.metadata)
+            pass
     return coupon_sums
 
 
@@ -59,14 +65,13 @@ def filter_bond(bond: Bond) -> bool:
 
 
 def collect_bonds_info(client: Client) -> List[Bond]:
-    bonds = list(filter(filter_bond, client.instruments.bonds().instruments))[:199]
+    # bonds = list(filter(filter_bond, client.instruments.bonds().instruments))[:199]
+    bonds = list(filter(filter_bond, client.instruments.bonds().instruments))
     figis = [bond.figi for bond in bonds]
     prices = client.market_data.get_last_prices(figi=figis).last_prices
     prices = [(price.price.units + price.price.nano / 10 ** 9) * 10 for price in prices]
     coupon_sums = count_coupon_sums_for_bonds(client, bonds)
     for i in range(len(bonds)):
-        # if bonds[i].figi == 'BBG00A0ZZ8A2':
-        #     pass
         bonds[i].price = prices[i]
         bonds[i].coupon_sum = coupon_sums[i]
     return bonds
@@ -89,4 +94,9 @@ def find_best_bonds() -> List[Tuple[Bond, float]]:
         percentages = [count_year_percentage_for_bond(bond) for bond in bonds]
         bonds = list(zip(bonds, percentages))
         bonds.sort(key=lambda x: -x[1])
+        for i, bond in enumerate(bonds):
+            print(i + 1, ' --> ', bond[0].name, ' ', bond[1], '%')
+        for i, bond in enumerate(bonds):
+            if bond[1] <= 30:
+                return bonds[i:i + 20]
         return bonds[:20]
