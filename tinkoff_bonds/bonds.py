@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 from typing import List, Tuple
 
@@ -7,7 +6,7 @@ from tinkoff.invest import Bond, Coupon
 from tinkoff.invest import Client
 from tinkoff.invest.exceptions import RequestError
 
-from secrets import TINKOFF_TOKEN
+from config import TINKOFF_TOKEN
 
 utc = pytz.UTC
 LAST_DATE = utc.localize(datetime(2025, 1, 1))
@@ -26,20 +25,10 @@ def count_coupon_sums_for_bonds(client: Client, bonds: List[Bond]) -> List[int]:
     n = len(bonds)
     ind = 0
     coupon_sums = [0] * n
-    cur = n
-    # while cur > CHUNK_LIMIT:
-    #     for _ in range(CHUNK_LIMIT):
-    #         coupon_sums[ind] = count_total_last_coupons_sum(client, bonds[ind])
-    #         ind += 1
-    #     cur -= CHUNK_LIMIT
-    #     print(ind)
-    #     time.sleep(3)
     for i in range(ind, n):
         try:
             coupon_sums[i] = count_total_last_coupons_sum(client, bonds[i])
         except RequestError as e:
-            # ratelimit_reset = e.details.
-            # print(e.metadata)
             pass
     return coupon_sums
 
@@ -65,7 +54,6 @@ def filter_bond(bond: Bond) -> bool:
 
 
 def collect_bonds_info(client: Client) -> List[Bond]:
-    # bonds = list(filter(filter_bond, client.instruments.bonds().instruments))[:199]
     bonds = list(filter(filter_bond, client.instruments.bonds().instruments))
     figis = [bond.figi for bond in bonds]
     prices = client.market_data.get_last_prices(figi=figis).last_prices
@@ -84,19 +72,38 @@ def count_year_percentage_for_bond(bond: Bond) -> float:
     start_date = datetime.now()
     num_of_months = (bond.maturity_date.year - start_date.year) * 12 + (bond.maturity_date.month - start_date.month)
     if num_of_months:
-        return (profit / expenses - 1) / num_of_months * 12 * 100
-    return (profit / expenses - 1) * 12 * 100
+        return round((profit / expenses - 1) / num_of_months * 12 * 100, 2)
+    return round((profit / expenses - 1) * 12 * 100, 2)
 
 
-def find_best_bonds() -> List[Tuple[Bond, float]]:
+def find_best_bonds_from_30_to_10_percents() -> List[Tuple[Bond, float]]:
     with Client(TINKOFF_TOKEN) as client:
         bonds = collect_bonds_info(client)
         percentages = [count_year_percentage_for_bond(bond) for bond in bonds]
         bonds = list(zip(bonds, percentages))
         bonds.sort(key=lambda x: -x[1])
-        for i, bond in enumerate(bonds):
-            print(i + 1, ' --> ', bond[0].name, ' ', bond[1], '%')
+        start_ind = -1
+        finish_ind = -1
         for i, bond in enumerate(bonds):
             if bond[1] <= 30:
-                return bonds[i:i + 20]
-        return bonds[:20]
+                start_ind = i
+                break
+        if start_ind == -1:
+            return []
+        for i, bond in enumerate(bonds[start_ind:]):
+            if bond[1] < 9:
+                return bonds[start_ind:start_ind + i]
+        return bonds[start_ind:]
+
+
+def best_bonds_message() -> str:
+    try:
+        bonds = find_best_bonds_from_30_to_10_percents()
+    except:
+        bonds = None
+    if not bonds:
+        return 'Нет подходящих облигаций'
+    message = ''
+    for i, bond in enumerate(bonds):
+        message += f'{i + 1}  -->  {bond[0].name} {bond[1]}%\n'
+    return message
