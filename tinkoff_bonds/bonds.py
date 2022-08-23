@@ -5,7 +5,7 @@ import pytz
 from tinkoff.invest import Bond, Coupon
 from tinkoff.invest import Client
 from tinkoff.invest.exceptions import RequestError
-
+from tinkoff_bonds.profit_bonds import Profit_Bond
 from config import TINKOFF_TOKEN
 
 utc = pytz.UTC
@@ -53,47 +53,38 @@ def filter_bond(bond: Bond) -> bool:
     return True
 
 
-def collect_bonds_info(client: Client) -> List[Bond]:
+def collect_bonds_info(client: Client) -> List[Profit_Bond]:
     bonds = list(filter(filter_bond, client.instruments.bonds().instruments))
     figis = [bond.figi for bond in bonds]
     prices = client.market_data.get_last_prices(figi=figis).last_prices
     prices = [(price.price.units + price.price.nano / 10 ** 9) * 10 for price in prices]
     coupon_sums = count_coupon_sums_for_bonds(client, bonds)
-    for i in range(len(bonds)):
-        bonds[i].price = prices[i]
-        bonds[i].coupon_sum = coupon_sums[i]
-    return bonds
+    profit_bonds = [None] * len(bonds)
+    for i, bond in enumerate(bonds):
+        profit_bond = Profit_Bond(bond)
+        profit_bond.price = prices[i]
+        profit_bond.coupon_sum = coupon_sums[i]
+        profit_bond.count_profit_percentage()
+        profit_bonds[i] = profit_bond
+
+    return profit_bonds
 
 
-def count_year_percentage_for_bond(bond: Bond) -> float:
-    nominal = bond.nominal.units + bond.nominal.nano / 10 ** 9
-    profit = nominal + bond.coupon_sum * PROFIT_COEFF
-    expenses = (bond.price + bond.aci_value.units + bond.aci_value.nano / 10 ** 9) * (1 + BROKER_COEFF)
-    start_date = datetime.now()
-    num_of_months = (bond.maturity_date.year - start_date.year) * 12 + (bond.maturity_date.month - start_date.month)
-    if num_of_months:
-        return round((profit / expenses - 1) / num_of_months * 12 * 100, 2)
-    return round((profit / expenses - 1) * 12 * 100, 2)
-
-
-def find_best_bonds_from_30_to_10_percents() -> List[Tuple[Bond, float]]:
+def find_best_bonds_from_30_to_10_percents() -> List[Profit_Bond]:
     with Client(TINKOFF_TOKEN) as client:
-        bonds = collect_bonds_info(client)
-        percentages = [count_year_percentage_for_bond(bond) for bond in bonds]
-        bonds = list(zip(bonds, percentages))
-        bonds.sort(key=lambda x: -x[1])
+        profit_bonds = collect_bonds_info(client)
+        profit_bonds.sort(key=lambda bond: -bond.profit_percentage)
         start_ind = -1
-        finish_ind = -1
-        for i, bond in enumerate(bonds):
-            if bond[1] <= 30:
+        for i, bond in enumerate(profit_bonds):
+            if bond.profit_percentage <= 30:
                 start_ind = i
                 break
         if start_ind == -1:
             return []
-        for i, bond in enumerate(bonds[start_ind:]):
-            if bond[1] < 9:
-                return bonds[start_ind:start_ind + i]
-        return bonds[start_ind:]
+        for i, bond in enumerate(profit_bonds[start_ind:]):
+            if bond.profit_percentage < 9:
+                return profit_bonds[start_ind:start_ind + i]
+        return profit_bonds[start_ind:]
 
 
 def best_bonds_message() -> str:
@@ -105,5 +96,6 @@ def best_bonds_message() -> str:
         return 'Нет подходящих облигаций'
     message = ''
     for i, bond in enumerate(bonds):
-        message += f'{i + 1}  -->  {bond[0].name} {bond[1]}%\n'
+        message += f'{i + 1}  -->  {bond.name} {bond.profit_percentage}%\n'
+    bonds[-1].set_rate()
     return message
