@@ -11,7 +11,14 @@ logging.basicConfig(level=logging.INFO)
 
 @dp.message_handler(commands=['start'])
 async def info(message: types.Message):
-    await message.answer(best_bonds_message())
+    await message.answer(
+        'Привет! Выбери какие тебя интересуют облигации. '
+        'Если высокого рейтинга, то напиши /high, если среднего - /middle. Если же любого, то /all.')
+
+
+@dp.message_handler(commands=['all', 'high', 'middle'])
+async def info(message: types.Message):
+    await message.answer(best_bonds_message(message.text[1:]))
 
 
 def main():

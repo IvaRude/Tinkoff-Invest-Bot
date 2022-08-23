@@ -11,10 +11,11 @@ from config import TINKOFF_TOKEN
 utc = pytz.UTC
 LAST_DATE = utc.localize(datetime(2025, 1, 1))
 
-CHUNK_LIMIT = 199
-
 BROKER_COEFF = 0.003
 PROFIT_COEFF = 0.87
+
+MAX_PERCENTAGE = 30
+MIN_PERCENTAGE = 9
 
 
 def get_coupon_cost(coupon: Coupon) -> float:
@@ -23,11 +24,10 @@ def get_coupon_cost(coupon: Coupon) -> float:
 
 def count_coupon_sums_for_bonds(client: Client, bonds: List[Bond]) -> List[int]:
     n = len(bonds)
-    ind = 0
     coupon_sums = [0] * n
-    for i in range(ind, n):
+    for i, bond in enumerate(bonds):
         try:
-            coupon_sums[i] = count_total_last_coupons_sum(client, bonds[i])
+            coupon_sums[i] = count_total_last_coupons_sum(client, bond)
         except RequestError as e:
             pass
     return coupon_sums
@@ -48,7 +48,8 @@ def filter_bond(bond: Bond) -> bool:
             or bond.maturity_date > LAST_DATE \
             or bond.maturity_date <= utc.localize(datetime.now()) \
             or bond.nominal.units != 1000 \
-            or bond.perpetual_flag:
+            or bond.perpetual_flag \
+            or bond.floating_coupon_flag:
         return False
     return True
 
@@ -66,36 +67,43 @@ def collect_bonds_info(client: Client) -> List[Profit_Bond]:
         profit_bond.coupon_sum = coupon_sums[i]
         profit_bond.count_profit_percentage()
         profit_bonds[i] = profit_bond
-
     return profit_bonds
 
 
-def find_best_bonds_from_30_to_10_percents() -> List[Profit_Bond]:
+def find_best_bonds_in_interval_percents(max_percentage=MAX_PERCENTAGE, min_percentage=MIN_PERCENTAGE) -> \
+        List[Profit_Bond]:
     with Client(TINKOFF_TOKEN) as client:
         profit_bonds = collect_bonds_info(client)
         profit_bonds.sort(key=lambda bond: -bond.profit_percentage)
         start_ind = -1
         for i, bond in enumerate(profit_bonds):
-            if bond.profit_percentage <= 30:
+            if bond.profit_percentage <= max_percentage:
                 start_ind = i
                 break
         if start_ind == -1:
             return []
         for i, bond in enumerate(profit_bonds[start_ind:]):
-            if bond.profit_percentage < 9:
+            if bond.profit_percentage < min_percentage:
                 return profit_bonds[start_ind:start_ind + i]
         return profit_bonds[start_ind:]
 
 
-def best_bonds_message() -> str:
+def filter_bonds_by_rate(bonds: List[Profit_Bond], rate: str) -> List[Profit_Bond]:
+    if rate == 'all':
+        return bonds
+    return [bond for bond in bonds if bond.get_rate() == rate]
+
+
+
+def best_bonds_message(rate: str = 'all') -> str:
     try:
-        bonds = find_best_bonds_from_30_to_10_percents()
+        bonds = find_best_bonds_in_interval_percents()
     except:
         bonds = None
     if not bonds:
         return 'Нет подходящих облигаций'
+    bonds = filter_bonds_by_rate(bonds, rate)
     message = ''
     for i, bond in enumerate(bonds):
         message += f'{i + 1}  -->  {bond.name} {bond.profit_percentage}%\n'
-    bonds[-1].set_rate()
     return message
