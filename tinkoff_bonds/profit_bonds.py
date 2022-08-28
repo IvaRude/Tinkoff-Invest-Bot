@@ -1,6 +1,8 @@
 from datetime import datetime
 
 import requests
+import asyncio
+import aiohttp
 from bs4 import BeautifulSoup
 from tinkoff.invest import Bond
 from tinkoff.invest.exceptions import RequestError
@@ -28,7 +30,7 @@ class Profit_Bond(Bond):
         self.price: float = 0
         self.coupon_sum: float = 0
         self.profit_percentage: float = 0
-        self.rate = 0
+        self.rate = 'NULL'
 
     def count_profit_percentage(self):
         nominal = self.nominal.units + self.nominal.nano / 10 ** 9
@@ -54,3 +56,19 @@ class Profit_Bond(Bond):
             pass
         except:
             return 'NULL'
+
+    async def async_get_rate(self, session: aiohttp.ClientSession) -> str:
+        headers = {
+            'User-Agent': 'Chrome 1.0',
+        }
+        async with session.get(url=URL + self.ticker + '/', headers=headers) as response:
+            soup = BeautifulSoup(await response.text(), 'html.parser')
+            try:
+                rate_word = soup.find_all('div', class_='SecurityHeader__panelText_KDJdO')[-1].text
+                self.rate = self.rates.get(rate_word, 'NULL')
+                return self.rates.get(rate_word, 'NULL')
+            except RequestError:
+                return await self.async_get_rate(session)
+            except:
+                self.rate = 'NULL'
+                return 'NULL'

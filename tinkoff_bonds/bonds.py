@@ -1,12 +1,15 @@
 from datetime import datetime
-from typing import List, Tuple
+from typing import List
 
 import pytz
+import asyncio
+import aiohttp
 from tinkoff.invest import Bond, Coupon
 from tinkoff.invest import Client
 from tinkoff.invest.exceptions import RequestError
-from tinkoff_bonds.profit_bonds import Profit_Bond
+
 from config import TINKOFF_TOKEN
+from tinkoff_bonds.profit_bonds import Profit_Bond
 
 utc = pytz.UTC
 LAST_DATE = utc.localize(datetime(2025, 1, 1))
@@ -94,6 +97,13 @@ def filter_bonds_by_rate(bonds: List[Profit_Bond], rate: str) -> List[Profit_Bon
     return [bond for bond in bonds if bond.get_rate() == rate]
 
 
+async def async_filter_bonds_by_rate(bonds: List[Profit_Bond], rate: str) -> List[Profit_Bond]:
+    if rate == 'all':
+        return bonds
+    async with aiohttp.ClientSession() as session:
+        tasks = [asyncio.create_task(bond.async_get_rate(session)) for bond in bonds]
+        await asyncio.gather(*tasks)
+    return [bond for bond in bonds if bond.rate == rate]
 
 def best_bonds_message(rate: str = 'all') -> str:
     try:
@@ -103,7 +113,23 @@ def best_bonds_message(rate: str = 'all') -> str:
     if not bonds:
         return 'Нет подходящих облигаций'
     bonds = filter_bonds_by_rate(bonds, rate)
+    # bonds = await async_filter_bonds_by_rate(bonds, rate)
     message = ''
     for i, bond in enumerate(bonds):
         message += f'{i + 1}  -->  {bond.name} {bond.profit_percentage}%\n'
+    return message
+
+async def async_best_bonds_message(rate: str = 'all') -> str:
+    try:
+        bonds = find_best_bonds_in_interval_percents()
+    except RequestError:
+        return await async_best_bonds_message(rate)
+    except:
+        bonds = None
+    if not bonds:
+        return 'Нет подходящих облигаций'
+    bonds = await async_filter_bonds_by_rate(bonds, rate)
+    message = ''
+    for i, bond in enumerate(bonds):
+        message += f'{i + 1}  -->  {bond.name}:  {bond.profit_percentage}%\n'
     return message
