@@ -4,6 +4,7 @@ from typing import List
 import pytz
 import asyncio
 import aiohttp
+import time
 from tinkoff.invest import Bond, Coupon
 from tinkoff.invest import Client
 from tinkoff.invest.exceptions import RequestError
@@ -32,7 +33,8 @@ def count_coupon_sums_for_bonds(client: Client, bonds: List[Bond]) -> List[int]:
         try:
             coupon_sums[i] = count_total_last_coupons_sum(client, bond)
         except RequestError as e:
-            pass
+            time.sleep(e.metadata[3])
+            coupon_sums[i] = count_total_last_coupons_sum(client, bond)
     return coupon_sums
 
 
@@ -113,7 +115,6 @@ def best_bonds_message(rate: str = 'all') -> str:
     if not bonds:
         return 'Нет подходящих облигаций'
     bonds = filter_bonds_by_rate(bonds, rate)
-    # bonds = await async_filter_bonds_by_rate(bonds, rate)
     message = ''
     for i, bond in enumerate(bonds):
         message += f'{i + 1}  -->  {bond.name} {bond.profit_percentage}%\n'
@@ -122,7 +123,7 @@ def best_bonds_message(rate: str = 'all') -> str:
 async def async_best_bonds_message(rate: str = 'all') -> str:
     try:
         bonds = find_best_bonds_in_interval_percents()
-    except RequestError:
+    except RequestError as e:
         return await async_best_bonds_message(rate)
     except:
         bonds = None

@@ -2,6 +2,7 @@ from datetime import datetime
 
 import requests
 import asyncio
+import time
 import aiohttp
 from bs4 import BeautifulSoup
 from tinkoff.invest import Bond
@@ -67,7 +68,8 @@ class Profit_Bond(Bond):
                 rate_word = soup.find_all('div', class_='SecurityHeader__panelText_KDJdO')[-1].text
                 self.rate = self.rates.get(rate_word, 'NULL')
                 return self.rates.get(rate_word, 'NULL')
-            except RequestError:
+            except RequestError as e:
+                time.sleep(e.metadata[3])
                 return await self.async_get_rate(session)
             except:
                 self.rate = 'NULL'
