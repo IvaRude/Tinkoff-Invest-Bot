@@ -4,3 +4,4 @@ aiohttp
 bs4
 lxml
 tinkoff-investments
+python-dotenv

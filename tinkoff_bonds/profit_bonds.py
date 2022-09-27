@@ -16,7 +16,7 @@ URL = 'https://www.tinkoff.ru/invest/bonds/'
 class Profit_Bond(Bond):
     rates = {
         'Низкий': 'low',
-        'Средний': 'middle',
+        'Средний': 'medium',
         'Высокий': 'high',
     }
 
@@ -69,7 +69,7 @@ class Profit_Bond(Bond):
                 self.rate = self.rates.get(rate_word, 'NULL')
                 return self.rates.get(rate_word, 'NULL')
             except RequestError as e:
-                time.sleep(e.metadata[3])
+                time.sleep(e.metadata[3] + 1)
                 return await self.async_get_rate(session)
             except:
                 self.rate = 'NULL'

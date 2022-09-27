@@ -33,7 +33,7 @@ def count_coupon_sums_for_bonds(client: Client, bonds: List[Bond]) -> List[int]:
         try:
             coupon_sums[i] = count_total_last_coupons_sum(client, bond)
         except RequestError as e:
-            time.sleep(e.metadata[3])
+            time.sleep(e.metadata[3] + 1)
             coupon_sums[i] = count_total_last_coupons_sum(client, bond)
     return coupon_sums
 
@@ -107,6 +107,7 @@ async def async_filter_bonds_by_rate(bonds: List[Profit_Bond], rate: str) -> Lis
         await asyncio.gather(*tasks)
     return [bond for bond in bonds if bond.rate == rate]
 
+
 def best_bonds_message(rate: str = 'all') -> str:
     try:
         bonds = find_best_bonds_in_interval_percents()
@@ -119,6 +120,7 @@ def best_bonds_message(rate: str = 'all') -> str:
     for i, bond in enumerate(bonds):
         message += f'{i + 1}  -->  {bond.name} {bond.profit_percentage}%\n'
     return message
+
 
 async def async_best_bonds_message(rate: str = 'all') -> str:
     try:

@@ -13,10 +13,10 @@ logging.basicConfig(level=logging.INFO)
 async def info(message: types.Message):
     await message.answer(
         'Привет! Выбери какие тебя интересуют облигации. '
-        'Если высокого рейтинга, то напиши /high, если среднего - /middle. Если же любого, то /all.')
+        'Если высокого рейтинга, то напиши /high, если среднего - /medium. Если же любого, то /all.')
 
 
-@dp.message_handler(commands=['all', 'high', 'middle'])
+@dp.message_handler(commands=['all', 'high', 'medium'])
 async def info(message: types.Message):
     # await message.answer(best_bonds_message(message.text[1:]))
     await message.answer(await async_best_bonds_message(message.text[1:]))
