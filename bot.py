@@ -3,6 +3,7 @@ import logging
 from aiogram import types
 from aiogram.utils import executor
 
+import rpc.rpc_client
 from dispatcher import dp
 from tinkoff_bonds.bonds import best_bonds_message, async_best_bonds_message
 
@@ -19,7 +20,9 @@ async def info(message: types.Message):
 @dp.message_handler(commands=['all', 'high', 'medium'])
 async def info(message: types.Message):
     # await message.answer(best_bonds_message(message.text[1:]))
-    await message.answer(await async_best_bonds_message(message.text[1:]))
+    # await message.answer(await async_best_bonds_message(message.text[1:]))
+    rate = message.text[1:]
+    await message.answer(await dp.bond_getter.get_bonds(rate))
 
 
 def main():
