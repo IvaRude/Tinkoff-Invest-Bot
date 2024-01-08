@@ -132,7 +132,5 @@ async def async_best_bonds_message(rate: str = 'all') -> str:
     if not bonds:
         return 'Нет подходящих облигаций'
     bonds = await async_filter_bonds_by_rate(bonds, rate)
-    message = ''
-    for i, bond in enumerate(bonds):
-        message += f'{i + 1}  -->  {bond.name}:  {bond.profit_percentage}%\n'
+    message = '\n'.join([f'{i + 1}  -->  {bond.name}:  {bond.profit_percentage}%' for i, bond in enumerate(bonds)])
     return message
