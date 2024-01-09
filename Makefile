@@ -1,4 +1,4 @@
-run: start_docker start_rpc_server start_botq
+run: start_docker start_rpc_server start_bot
 start_docker:
         docker-compose up -d
 start_rpc_server:
